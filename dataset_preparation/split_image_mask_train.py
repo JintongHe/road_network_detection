@@ -189,8 +189,8 @@ def pixel_2_meter(img_path):
 
 def main():
     split_sizes = [[500, 500], [700, 700], [900, 900]]
-    images_folder_path = "D:/Code/Datasets/wind_turbine/dataset20240202/access_road/train/training_img"
-    masks_folder_path = "D:/Code/Datasets/wind_turbine/dataset20240202/access_road/train/training_label"
+    images_folder_path = "D:/Code/Datasets/wind_turbine/dataset20240202/access_road/val/val_img"
+    masks_folder_path = "D:/Code/Datasets/wind_turbine/dataset20240202/access_road/val/val_label"
     input_img_size = 1024
     split_images_segment_v1(images_folder_path, split_sizes, masks_folder_path, input_img_size)
 

@@ -486,13 +486,13 @@ def main():
     # https://github.com/qubvel/segmentation_models.pytorch
     architecture = 'deeplabv3plus'
 
-    encoder = 'resnet50'
-    device = [0, 1, 2, 3]
+    encoder = 'resnet34'
+    device = [4, 5, 7]
     save_model_every_n_epochs = 25
     max_epochs = 200
     checkpoint_callback_dir = os.path.join(base_dir, 'model_checkpoints/')
-    img_size = 640
-    batch_size = 8
+    img_size = 1024
+    batch_size = 6
     initial_learning_rate = 1e-3
     patience = 20
     log_dir = os.path.join(base_dir, 'tb_logs')

@@ -513,7 +513,7 @@ def main():
     img_dir = "/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/test/test_img"
     split_arr = [[300, 300], [500, 500], [700, 700]]
     coordinates = []
-    out_dir = "/home/zkxq/project/hjt/smp/out"
+    out_dir = "/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/out"
     model_path = "/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/model_checkpoints/best-checkpoint.ckpt"
     # single_predict(img_path, split_arr, model_path, out_dir, coordinates)
     batch_predict(img_dir, split_arr, model_path, out_dir, coordinates)
