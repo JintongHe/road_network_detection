@@ -11,32 +11,19 @@ IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.gif', '.
 
 def resize_and_pad_image(img, split_size, pad_color=(255, 255, 255), new_size=1024):
     h, w = img.shape[:2]
-
-    # Determine the scaling factor and resize
-    scale = min(new_size / h, new_size / w)
-    new_h, new_w = int(h * scale), int(w * scale)
-    resized_img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-
-    # Create a new image with the desired size and white background
-    # padded_img = np.full((split_size[0], split_size[1], 3), pad_color, dtype=np.uint8)
-    padded_img = np.full((new_size, new_size, 3), pad_color, dtype=np.uint8)
-    # Place the resized image onto the center of the square image
-    padded_img[:new_h, :new_w, :] = resized_img
-
+    padded_img = np.full((split_size, split_size, 3), pad_color, dtype=np.uint8)
+    padded_img[:h, :w, :] = img
+    padded_img = cv2.resize(padded_img, (new_size, new_size), interpolation=cv2.INTER_LINEAR)
     return padded_img
 
 def resize_and_pad_mask(mask, split_size, pad_value=0, new_size=1024):
     h, w = mask.shape[:2]
-    # Determine the scaling factor and resize
-    scale = min(new_size / h, new_size / w)
-    new_h, new_w = int(h * scale), int(w * scale)
-    resized_mask = cv2.resize(mask, (new_w, new_h), interpolation=cv2.INTER_NEAREST)  # Use INTER_NEAREST for masks
 
-    # Create a new mask with the desired size and default background value
-    # padded_mask = np.full((split_size[0], split_size[1]), pad_value, dtype=mask.dtype)
-    padded_mask = np.full((new_size, new_size), pad_value, dtype=mask.dtype)
+    padded_mask = np.full((split_size, split_size), pad_value, dtype=mask.dtype)
     # Place the resized mask onto the top-left of the square mask
-    padded_mask[:new_h, :new_w] = resized_mask
+    padded_mask[:h, :w] = mask
+
+    padded_mask = cv2.resize(padded_mask, (new_size, new_size), interpolation=cv2.INTER_NEAREST)  # Use INTER_NEAREST for masks
 
     return padded_mask
 
@@ -86,7 +73,7 @@ def process_image_segment_v1(filename, IMAGE_FOLDER, split_sizes, training_image
                                                                       local_image_height) for band in
                             range(num_bands)]
                     pic = np.dstack(data[::-1])  # Assuming RGB order
-                    pic = resize_and_pad_image(pic, split_size, pad_color=(255, 255, 255), new_size=input_img_size)
+                    pic = resize_and_pad_image(pic, cut_width, pad_color=(255, 255, 255), new_size=input_img_size)
                     cv2.imwrite(training_image_file_path, pic)
 
 def process_image_segment_v2(filename, IMAGE_FOLDER, split_sizes, training_image_folder_path,
@@ -138,7 +125,7 @@ def process_image_segment_v2(filename, IMAGE_FOLDER, split_sizes, training_image
                                                                               local_image_height) for band in
                                     range(num_bands)]
                             pic = np.dstack(data[::-1])  # Assuming RGB order
-                            pic = resize_and_pad_image(pic, split_size, pad_color=(255, 255, 255), new_size=input_img_size)
+                            pic = resize_and_pad_image(pic, cut_width, pad_color=(255, 255, 255), new_size=input_img_size)
                             cv2.imwrite(training_image_file_path, pic)
 
 
@@ -189,8 +176,8 @@ def pixel_2_meter(img_path):
 
 def main():
     split_sizes = [[500, 500], [700, 700], [900, 900]]
-    images_folder_path = "D:/Code/Datasets/wind_turbine/dataset20240202/access_road/val/val_img"
-    masks_folder_path = "D:/Code/Datasets/wind_turbine/dataset20240202/access_road/val/val_label"
+    images_folder_path = "D:/Code/Datasets/wind_turbine/dataset20240202/access_road/train/training_img"
+    masks_folder_path = "D:/Code/Datasets/wind_turbine/dataset20240202/access_road/train/training_label"
     input_img_size = 1024
     split_images_segment_v1(images_folder_path, split_sizes, masks_folder_path, input_img_size)
 

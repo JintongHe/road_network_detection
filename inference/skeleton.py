@@ -11,16 +11,18 @@ from scipy.spatial.distance import pdist, squareform
 from scipy import ndimage as ndi
 from collections import defaultdict, OrderedDict
 import sys
+from PIL import Image
 from shapely.geometry import LineString, mapping
 import json
 from osgeo import gdal
 from datetime import date
 from multiprocessing import Pool
+from tqdm import tqdm
 import math
 import re
 import warnings
 warnings.filterwarnings("ignore")
-
+Image.MAX_IMAGE_PIXELS = None
 def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = tee(iterable)
@@ -184,31 +186,66 @@ def remove_small_terminal(G, ratio):
     return G
 
 linestring = "LINESTRING {}"
+# def make_skeleton(root, fn, debug, fix_borders, ratio):
+#     replicate = 5
+#     clip = 2
+#     rec = replicate + clip
+#     # open and skeletonize
+#     img = cv2.imread(os.path.join(root, fn), cv2.IMREAD_GRAYSCALE)
+#     # assert img.shape == (1300, 1300)
+#     if fix_borders:
+#         img = cv2.copyMakeBorder(img, replicate, replicate, replicate, replicate, cv2.BORDER_REPLICATE)
+#     img_copy = None
+#     if debug:
+#         if fix_borders:
+#             img_copy = np.copy(img[replicate:-replicate,replicate:-replicate])
+#         else:
+#             img_copy = np.copy(img)
+#     thresh = 0.5# threshes[fn[2]]
+#     img = preprocess(img, thresh, ratio)
+#     if not np.any(img):
+#         return None, None
+#     ske = skeletonize(img).astype(np.uint16)
+#     if fix_borders:
+#         ske = ske[rec:-rec, rec:-rec]
+#         ske = cv2.copyMakeBorder(ske, clip, clip, clip, clip, cv2.BORDER_CONSTANT, value=0)
+#     return img_copy, ske
 def make_skeleton(root, fn, debug, fix_borders, ratio):
     replicate = 5
     clip = 2
     rec = replicate + clip
-    # open and skeletonize
-    img = cv2.imread(os.path.join(root, fn), cv2.IMREAD_GRAYSCALE)
-    # assert img.shape == (1300, 1300)
+    # Load image using PIL and convert to grayscale
+    img_path = os.path.join(root, fn)
+    img = Image.open(img_path).convert('L')
+    img = np.array(img)
+
+    # Apply border if needed
     if fix_borders:
-        img = cv2.copyMakeBorder(img, replicate, replicate, replicate, replicate, cv2.BORDER_REPLICATE)
+        img = np.pad(img, pad_width=replicate, mode='edge')
+
     img_copy = None
     if debug:
         if fix_borders:
-            img_copy = np.copy(img[replicate:-replicate,replicate:-replicate])
+            img_copy = np.copy(img[replicate:-replicate, replicate:-replicate])
         else:
             img_copy = np.copy(img)
-    thresh = 0.5# threshes[fn[2]]
+
+    thresh = 0.5  # Example threshold
     img = preprocess(img, thresh, ratio)
     if not np.any(img):
         return None, None
-    ske = skeletonize(img).astype(np.uint16)
+
+    # Convert image to boolean (necessary for skeletonize)
+    img_bool = img.astype(bool)
+    # Skeletonize
+    ske = skeletonize(img_bool).astype(np.uint16)
+
+    # Adjust skeleton image according to borders
     if fix_borders:
         ske = ske[rec:-rec, rec:-rec]
-        ske = cv2.copyMakeBorder(ske, clip, clip, clip, clip, cv2.BORDER_CONSTANT, value=0)
-    return img_copy, ske
+        ske = np.pad(ske, pad_width=clip, mode='constant', constant_values=0)
 
+    return img_copy, ske
 
 def add_small_segments(G, terminal_points, terminal_lines, ratio):
     node = G.nodes
@@ -508,32 +545,7 @@ def create_geojson(linestrings, image_path, out_file_path):
     with open(show_path, 'w', encoding='utf8') as out_file:
         out_file.write(res)
 
-if __name__ == "__main__":
-    # prefix = 'AOI'
-    # results_root = r'/results/results'
-    # # results_root = r'd:\tmp\roads\albu\results\results'
-    # # root = os.path.join(results_root, r'results\2m_4fold_512_30e_d0.2_g0.2')
-    # root = os.path.join(results_root, r'2m_4fold_512_30e_d0.2_g0.2_test', 'merged')
-    # f = partial(build_graph, root)
-    # l = [v for v in os.listdir(root) if prefix in v]
-    # l = list(sorted(l))
-    # with Pool() as p:
-    #     data = p.map(f, l)
-    # all_data = []
-    # for k, v in data:
-    #     for val in v:
-    #         all_data.append((k, val))
-    # df = pd.DataFrame(all_data, columns=['ImageId', 'WKT_Pix'])
-    # df.to_csv(sys.argv[1] + '.txt', index=False)
-    # Specify the directory where your grayscale images are stored
-
-    mask_dir = r"/home/zkxq/project/hjt/smp/out"
-    image_dir = r"/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/test/test_img"
-    # Define the file prefix or suffix that your images have, if any
-    # For example, if your images are named like "AOI_1_grayscale.png",
-    # you would keep 'AOI' as the prefix.
-    image_prefix = 'AOI'  # Change this to match your file naming pattern
-
+def main(image_dir, mask_dir, out_dir):
     # Create a partial function that includes the directory as an argument
     f = partial(build_graph, mask_dir, image_dir)
 
@@ -545,52 +557,18 @@ if __name__ == "__main__":
 
     # Use multiprocessing to process all images in parallel
     with Pool() as p:
-        data = p.map(f, image_files)
+        tasks = tqdm(p.imap(f, image_files), total=len(image_files), desc="Generating geojson files")
+        data = list(tasks)
 
-    # Compile all data into a list
-    all_data = []
-    out_file_path = "/home/zkxq/project/hjt/smp/geojson"
     for k, v in data:
         image_path = os.path.join(image_dir, k + '.tif')
-        create_geojson(linestrings=v, image_path=image_path, out_file_path=out_file_path)
-        for val in v:
-            all_data.append((k, val))
+        create_geojson(linestrings=v, image_path=image_path, out_file_path=out_dir)
 
-    # Create a DataFrame from the compiled data
-    df = pd.DataFrame(all_data, columns=['ImageId', 'WKT_Pix'])
 
-    # Define the output CSV file name
-    output_csv_file = '/home/zkxq/project/hjt/smp/datasets/out'  # Change this to your desired file name
+if __name__ == "__main__":
+    mask_dir = r"/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/out"
+    image_dir = r"/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/test/test_img"
 
-    # Save the DataFrame to a CSV file
-    df.to_csv(output_csv_file, index=False)
+    out_file_path = "/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/geojson"
+    main(image_dir, mask_dir, out_file_path)
 
-    # # Specify the root directory where your image files are located
-    # root = "/home/zkxq/project/hjt/smp/out"
-    #
-    # # Specify the name of the single image file you want to process
-    # single_image_file = 'access_road_zfengji39_20210325.tif'
-    #
-    # # Call the build_graph function directly with the path to your single image file
-    # city, wkt = build_graph(root, single_image_file, debug=False)
-    #
-    # # If you want to print the output or do something with it, you can do that here
-    # # For example, print the wkt data:
-    # print(f"City: {city}")
-    # for line in wkt:
-    #     print(line)
-    # # Compile all data into a list
-    # all_data = []
-    # out_file_path = "/home/zkxq/project/hjt/smp/geojson"
-    # image_path = "/home/zkxq/project/hjt/smp/test_images/access_road_zfengji39_20210325.tif"
-    # create_geojson(linestrings=wkt, image_path=image_path, out_file_path=out_file_path)
-    #
-    # # # If you want to save the output to a CSV file
-    # # all_data = [(city, val) for val in wkt]
-    # # df = pd.DataFrame(all_data, columns=['ImageId', 'WKT_Pix'])
-    # #
-    # # # Define the output CSV file name
-    # # output_csv_file = 'output_filename.csv'  # Change this to your desired file name
-    # #
-    # # # Save the DataFrame to a CSV file
-    # # df.to_csv(output_csv_file, index=False)

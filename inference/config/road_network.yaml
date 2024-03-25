@@ -1,0 +1,6 @@
+img_path: "/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/test/test_img"
+split_arr: [[500, 500], [700, 700], [900, 900]] # 单位：米
+gpu_ids: [4, 5, 6, 7]
+image_size: 1024
+out_dir: "/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/out"
+model_path: "/home/zkxq/project/hjt/smp/datasets/Wind_Turbine/model_checkpoints/best-20240322.ckpt"
